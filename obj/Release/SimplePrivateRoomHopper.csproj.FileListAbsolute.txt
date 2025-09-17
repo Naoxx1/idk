@@ -1,0 +1,10 @@
+C:\Program Files\Oculus\Software\Software\another-axiom-gorilla-tag\BepInEx\plugins\SimplePrivateRoomHopper.dll
+C:\Program Files\Oculus\Software\Software\another-axiom-gorilla-tag\BepInEx\plugins\SimplePrivateRoomHopper.pdb
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.csproj.AssemblyReference.cache
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.AssemblyInfoInputs.cache
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.AssemblyInfo.cs
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.csproj.CoreCompileInputs.cache
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.sourcelink.json
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.dll
+C:\Users\dadin\DataCollection-Project\SimplePrivateRoomHopper\obj\Release\SimplePrivateRoomHopper.pdb
