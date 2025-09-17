@@ -4,57 +4,22 @@ using Photon.Pun;
 using Photon.Realtime;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using GorillaNetworking;
 using System.IO;
 using Newtonsoft.Json;
 
-[BepInPlugin("GorillaTagLobbyHopper", "Gorilla Tag Private Lobby Hopper", "1.0.0")]
+[BepInPlugin("SimplePrivateRoomHopper", "Simple Private Room Hopper", "1.0.0")]
 public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallbacks
 {
     Rect windowRect = new Rect(100, 100, 700, 500);
-    int D = 0;
     Color color = Color.white;
     Color windowColor = new Color(0.1f, 0.1f, 0.1f, 1f);
-    int currentTab = 0;
     Texture2D? solidTex;
     Texture2D? windowTex;
-    GUIStyle? tabStyle;
     GUIStyle? tabPressedStyle;
     GUIStyle? windowStyle;
     bool ini = false;
-    Vector2 scrollPos = Vector2.zero;
-    
-    // Lobby Hopper Variables
-    private List<RoomInfo> availableRooms = new List<RoomInfo>();
-    private bool isHopping = false;
-    private bool autoJoin = false;
-    private int minPlayers = 1;
-    private int maxPlayers = 10;
-    private string targetRegion = "US";
-    private string statusMessage = "Ready to hop lobbies";
-    private float lastHopTime = 0f;
-    private float hopDelay = 2f;
-    private Vector2 lobbyScrollPos = Vector2.zero;
-    private string[] regions = { "US", "EU", "USW"};
-    private int selectedRegionIndex = 0;
-    
-    // Custom Room List Variables
-    private List<string> customRoomList = new List<string>();
-    private string newRoomName = "";
-    private bool useCustomList = false;
-    private int currentRoomIndex = 0;
-    private Vector2 customListScrollPos = Vector2.zero;
-    
-    // Private Rooms Hopper Variables
-    private bool privateRoomsHopperEnabled = false;
-    private bool isJoiningPrivateRoom = false;
-    private List<string> privateRoomCodes = new List<string>();
-    private string newPrivateRoomCode = "";
-    private int currentPrivateRoomIndex = 0;
-    private float lastPrivateJoinAttempt = 0f;
-    private const float PRIVATE_JOIN_COOLDOWN = 5f;
-    private Vector2 privateRoomsScrollPos = Vector2.zero;
+    Vector2 privateRoomsScrollPos = Vector2.zero;
     
     // Simple Private Room Toggle Variables
     private bool simplePrivateRoomToggle = false;
@@ -65,6 +30,11 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
     private const float SIMPLE_LEAVE_COOLDOWN = 5f; // 5 seconds after leaving before joining next room
     private Dictionary<string, float> failedRooms = new Dictionary<string, float>(); // Track failed rooms with timestamps
     private const float FAILED_ROOM_COOLDOWN = 30f; // 30 seconds before retrying a failed room
+    
+    // Private Room Management
+    private List<string> privateRoomCodes = new List<string>();
+    private string newPrivateRoomCode = "";
+    private int currentPrivateRoomIndex = 0;
 
     void Awake()
     {
@@ -81,7 +51,7 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
         PhotonNetwork.RemoveCallbackTarget(this);
     }
 
-    void OnGUI() // DONT MESS WITH THIS UNLESS YOU KNOW WHAT YOU ARE DOING
+    void OnGUI()
     {
         if (!ini)
         {
@@ -89,13 +59,11 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
             solidTex.SetPixel(0, 0, new Color(0.15f, 0.15f, 0.15f, 1f));
             solidTex.Apply();
             windowTex = MakeTex(1, 1, windowColor);
-            tabStyle = new GUIStyle(GUI.skin.button);
-            tabStyle.normal.background = solidTex;
-            tabStyle.normal.textColor = Color.white;
-            tabStyle.fontStyle = FontStyle.Bold;
-            tabStyle.padding = new RectOffset(8, 8, 4, 4);
-            tabPressedStyle = new GUIStyle(tabStyle);
-            tabPressedStyle.normal.background = MakeTex(1, 1, new Color(0.2f, 0.6f, 1f, 1f));
+            tabPressedStyle = new GUIStyle(GUI.skin.button);
+            tabPressedStyle.normal.background = solidTex;
+            tabPressedStyle.normal.textColor = Color.white;
+            tabPressedStyle.fontStyle = FontStyle.Bold;
+            tabPressedStyle.padding = new RectOffset(8, 8, 4, 4);
             windowStyle = new GUIStyle(GUI.skin.window);
             windowStyle.normal.background = windowTex;
             windowStyle.hover.background = windowTex;
@@ -113,11 +81,6 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
         windowRect = GUILayout.Window(0, windowRect, ww, "", windowStyle);
     }
 
-    void home() // Simple GUI - just private room hopper
-    {
-        SimplePrivateRoomHopperGUI(0);
-    }
-
     void ww(int id)
     {
         GUILayout.BeginHorizontal(GUI.skin.box);
@@ -128,286 +91,15 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
         GUILayout.Box("", GUILayout.Height(30), GUILayout.ExpandWidth(true));
         Rect headerRect = GUILayoutUtility.GetLastRect();
         GUI.DrawTexture(headerRect, MakeTex(1, 1, new Color(0.15f, 0.15f, 0.15f, 1f)));
-        GUI.Label(new Rect(headerRect.x + 10, headerRect.y + 5, 200, 20), "Gorilla Tag Lobby Hopper", headerStyle); // MOD NAME HERE
+        GUI.Label(new Rect(headerRect.x + 10, headerRect.y + 5, 200, 20), "Simple Private Room Hopper", headerStyle);
         GUI.Label(new Rect(headerRect.x + windowRect.width - 220, headerRect.y + 5, 210, 20), System.DateTime.Now.ToString("MM/dd/yyyy hh:mm:ss tt"), headerStyle);
         GUILayout.EndHorizontal();
         GUILayout.Space(5);
         GUILayout.BeginVertical();
         GUILayout.Space(5);
-        home();
+        SimplePrivateRoomHopperGUI(0);
         GUILayout.EndVertical();
         GUI.DragWindow();
-    }
-
-    void LobbyHopper(int id)
-    {
-        GUILayout.Label("LOBBY HOPPER", tabPressedStyle);
-        GUILayout.Space(10);
-        
-        // Status Display
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Status: ", GUILayout.Width(60));
-        GUILayout.Label(statusMessage);
-        GUILayout.EndHorizontal();
-        
-        // Info about mod status
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("ℹ️ MOD IN SAFE MODE - No interference with normal gameplay", GUILayout.Width(350));
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(10);
-        
-        // Control Buttons
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button(isHopping ? "STOP HOPPING" : "START HOPPING", GUILayout.Height(30)))
-        {
-            if (isHopping)
-            {
-                StopHopping();
-            }
-            else
-            {
-                StartHopping();
-            }
-        }
-        
-        if (GUILayout.Button("REFRESH LOBBIES", GUILayout.Height(30)))
-        {
-            RefreshLobbies();
-        }
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(10);
-        
-        // Auto Join Toggle
-        autoJoin = GUILayout.Toggle(autoJoin, "Auto Join Best Lobby");
-        
-        GUILayout.Space(5);
-        
-        // Custom Room List Toggle
-        useCustomList = GUILayout.Toggle(useCustomList, "Use Custom Room List");
-        
-        GUILayout.Space(10);
-        
-        // Custom Room List Management
-        if (useCustomList)
-        {
-            GUILayout.Label("Custom Room List:");
-            
-            // Add new room input
-            GUILayout.BeginHorizontal();
-            newRoomName = GUILayout.TextField(newRoomName, GUILayout.Width(200));
-            if (GUILayout.Button("ADD", GUILayout.Width(60), GUILayout.Height(20)))
-            {
-                AddToCustomList(newRoomName);
-                newRoomName = "";
-            }
-            GUILayout.EndHorizontal();
-            
-            GUILayout.Space(5);
-            
-            // Custom room list display
-            customListScrollPos = GUILayout.BeginScrollView(customListScrollPos, GUILayout.Height(150));
-            for (int i = 0; i < customRoomList.Count; i++)
-            {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label($"{i + 1}. {customRoomList[i]}");
-                if (GUILayout.Button("JOIN", GUILayout.Width(50), GUILayout.Height(20)))
-                {
-                    JoinRoom(customRoomList[i]);
-                }
-                if (GUILayout.Button("X", GUILayout.Width(25), GUILayout.Height(20)))
-                {
-                    RemoveFromCustomList(i);
-                }
-                GUILayout.EndHorizontal();
-            }
-            GUILayout.EndScrollView();
-            
-            GUILayout.Space(5);
-            
-            // Custom list controls
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("CLEAR LIST", GUILayout.Height(25)))
-            {
-                customRoomList.Clear();
-                currentRoomIndex = 0;
-            }
-            if (GUILayout.Button("HOP NEXT", GUILayout.Height(25)))
-            {
-                HopToNextCustomRoom();
-            }
-            GUILayout.EndHorizontal();
-            
-            GUILayout.Space(10);
-        }
-        
-        // Available Lobbies List
-        GUILayout.Label($"Available Lobbies ({availableRooms.Count}):");
-        lobbyScrollPos = GUILayout.BeginScrollView(lobbyScrollPos, GUILayout.Height(200));
-        
-        foreach (var room in availableRooms)
-        {
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"{room.Name} - {room.PlayerCount}/{room.MaxPlayers} players");
-            if (GUILayout.Button("JOIN", GUILayout.Width(60), GUILayout.Height(20)))
-            {
-                JoinRoom(room.Name);
-            }
-            if (GUILayout.Button("+", GUILayout.Width(25), GUILayout.Height(20)))
-            {
-                AddToCustomList(room.Name);
-            }
-            GUILayout.EndHorizontal();
-        }
-        
-        GUILayout.EndScrollView();
-    }
-
-    void PrivateRoomsHopper(int id)
-    {
-        GUILayout.Label("PRIVATE ROOMS HOPPER", tabPressedStyle);
-        GUILayout.Space(10);
-        
-        // Status Display
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Status: ", GUILayout.Width(60));
-        GUILayout.Label(privateRoomsHopperEnabled ? "Private rooms hopper ACTIVE" : "Private rooms hopper DISABLED");
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(10);
-        
-        // Main Toggle Button
-        if (GUILayout.Button(privateRoomsHopperEnabled ? "DISABLE PRIVATE ROOMS HOPPER" : "ENABLE PRIVATE ROOMS HOPPER", GUILayout.Height(40)))
-        {
-            TogglePrivateRoomsHopper();
-        }
-        
-        GUILayout.Space(10);
-        
-        // Private Room Codes Management
-        GUILayout.Label("Private Room Codes:");
-        
-        // Add new room code input
-        GUILayout.BeginHorizontal();
-        newPrivateRoomCode = GUILayout.TextField(newPrivateRoomCode, GUILayout.Width(200));
-        if (GUILayout.Button("ADD", GUILayout.Width(60), GUILayout.Height(20)))
-        {
-            AddPrivateRoomCode(newPrivateRoomCode);
-            newPrivateRoomCode = "";
-        }
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(5);
-        
-        // Private room codes list
-        privateRoomsScrollPos = GUILayout.BeginScrollView(privateRoomsScrollPos, GUILayout.Height(150));
-        for (int i = 0; i < privateRoomCodes.Count; i++)
-        {
-            GUILayout.BeginHorizontal();
-            GUILayout.Label($"{i + 1}. {privateRoomCodes[i]}");
-            if (GUILayout.Button("JOIN", GUILayout.Width(50), GUILayout.Height(20)))
-            {
-                JoinPrivateRoom(privateRoomCodes[i]);
-            }
-            if (GUILayout.Button("X", GUILayout.Width(25), GUILayout.Height(20)))
-            {
-                RemovePrivateRoomCode(i);
-            }
-            GUILayout.EndHorizontal();
-        }
-        GUILayout.EndScrollView();
-        
-        GUILayout.Space(5);
-        
-        // Private room controls
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("CLEAR ALL", GUILayout.Height(25)))
-        {
-            privateRoomCodes.Clear();
-            currentPrivateRoomIndex = 0;
-            SavePrivateRoomCodes();
-        }
-        if (GUILayout.Button("JOIN NEXT", GUILayout.Height(25)))
-        {
-            JoinNextPrivateRoom();
-        }
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(10);
-        
-        // Current room info
-        if (PhotonNetwork.InRoom)
-        {
-            GUILayout.Label($"Current Room: {PhotonNetwork.CurrentRoom.Name}");
-            GUILayout.Label($"Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
-        }
-        else
-        {
-            GUILayout.Label("Not in any room");
-        }
-        
-        GUILayout.Space(10);
-        
-        // Auto-join info
-        if (privateRoomsHopperEnabled)
-        {
-            GUILayout.Label("Auto-joining private rooms every 5 seconds");
-            GUILayout.Label($"Next attempt in: {Mathf.Max(0, PRIVATE_JOIN_COOLDOWN - (Time.time - lastPrivateJoinAttempt)):F1}s");
-        }
-    }
-
-    void Settings(int id)
-    {
-        GUILayout.Label("SETTINGS", tabPressedStyle);
-        GUILayout.Space(10);
-        
-        // Player Count Settings
-        GUILayout.Label("Player Count Filter:");
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Min: ", GUILayout.Width(40));
-        minPlayers = int.Parse(GUILayout.TextField(minPlayers.ToString(), GUILayout.Width(50)));
-        GUILayout.Label("Max: ", GUILayout.Width(40));
-        maxPlayers = int.Parse(GUILayout.TextField(maxPlayers.ToString(), GUILayout.Width(50)));
-        GUILayout.EndHorizontal();
-        
-        GUILayout.Space(10);
-        
-        // Region Selection
-        GUILayout.Label("Target Region:");
-        selectedRegionIndex = GUILayout.SelectionGrid(selectedRegionIndex, regions, regions.Length);
-        targetRegion = regions[selectedRegionIndex];
-        
-        GUILayout.Space(10);
-        
-        // Hop Delay
-        GUILayout.Label($"Hop Delay: {hopDelay:F1}s");
-        hopDelay = GUILayout.HorizontalSlider(hopDelay, 0.5f, 10f);
-        
-        GUILayout.Space(10);
-        
-        // Custom Room List Status
-        GUILayout.Space(10);
-        GUILayout.Label("Custom Room List Status:");
-        GUILayout.Label($"Rooms in list: {customRoomList.Count}");
-        GUILayout.Label($"Use custom list: {useCustomList}");
-        if (customRoomList.Count > 0)
-        {
-            GUILayout.Label($"Current index: {currentRoomIndex + 1}/{customRoomList.Count}");
-            GUILayout.Label($"Next room: {(currentRoomIndex < customRoomList.Count ? customRoomList[currentRoomIndex] : "None")}");
-        }
-        
-        GUILayout.Space(10);
-        
-        // Connection Status
-        GUILayout.Label("Connection Status:");
-        GUILayout.Label($"Connected: {PhotonNetwork.IsConnected}");
-        GUILayout.Label($"In Room: {PhotonNetwork.InRoom}");
-        if (PhotonNetwork.InRoom)
-        {
-            GUILayout.Label($"Current Room: {PhotonNetwork.CurrentRoom.Name}");
-            GUILayout.Label($"Players: {PhotonNetwork.CurrentRoom.PlayerCount}/{PhotonNetwork.CurrentRoom.MaxPlayers}");
-        }
     }
 
     void SimplePrivateRoomHopperGUI(int id)
@@ -549,166 +241,7 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
         }
     }
 
-    // Lobby Hopping Methods
-    void StartHopping()
-    {
-        statusMessage = "Lobby hopper disabled to prevent interference with normal gameplay";
-        // Disabled to prevent connection issues
-    }
-    
-    void StopHopping()
-    {
-        isHopping = false;
-        statusMessage = "Hopping stopped";
-    }
-    
-    IEnumerator HoppingCoroutine()
-    {
-        // Disabled to prevent connection issues
-        yield break;
-    }
-    
-    void RefreshLobbies()
-    {
-        statusMessage = "Lobby refresh disabled to prevent interference with normal gameplay";
-        // Disabled to prevent connection issues
-    }
-    
-    RoomInfo GetBestRoom()
-    {
-        var filteredRooms = availableRooms.Where(room => 
-            room.PlayerCount >= minPlayers && 
-            room.PlayerCount <= maxPlayers &&
-            room.IsOpen &&
-            !room.RemovedFromList
-        ).ToList();
-        
-        if (filteredRooms.Count == 0) return null;
-        
-        // Prefer rooms with more players but not full
-        return filteredRooms.OrderByDescending(room => room.PlayerCount)
-                           .ThenBy(room => room.MaxPlayers - room.PlayerCount)
-                           .FirstOrDefault();
-    }
-    
-    void JoinRoom(string roomName)
-    {
-        statusMessage = $"Room joining disabled to prevent interference with normal gameplay";
-        // Disabled to prevent connection issues
-    }
-    
-    // Custom Room List Methods
-    void AddToCustomList(string roomName)
-    {
-        if (!string.IsNullOrEmpty(roomName) && !customRoomList.Contains(roomName))
-        {
-            customRoomList.Add(roomName);
-            statusMessage = $"Added {roomName} to custom list";
-        }
-    }
-    
-    void RemoveFromCustomList(int index)
-    {
-        if (index >= 0 && index < customRoomList.Count)
-        {
-            string removedRoom = customRoomList[index];
-            customRoomList.RemoveAt(index);
-            statusMessage = $"Removed {removedRoom} from custom list";
-            
-            // Adjust current index if needed
-            if (currentRoomIndex >= customRoomList.Count)
-            {
-                currentRoomIndex = 0;
-            }
-        }
-    }
-    
-    void HopToNextCustomRoom()
-    {
-        if (customRoomList.Count == 0)
-        {
-            statusMessage = "Custom room list is empty";
-            return;
-        }
-        
-        if (currentRoomIndex >= customRoomList.Count)
-        {
-            currentRoomIndex = 0;
-        }
-        
-        string roomToJoin = customRoomList[currentRoomIndex];
-        statusMessage = $"Hopping to {roomToJoin} ({currentRoomIndex + 1}/{customRoomList.Count})";
-        JoinRoom(roomToJoin);
-        
-        // Move to next room in list
-        currentRoomIndex = (currentRoomIndex + 1) % customRoomList.Count;
-    }
-    
-    // Private Rooms Hopper Methods
-    void TogglePrivateRoomsHopper()
-    {
-        privateRoomsHopperEnabled = !privateRoomsHopperEnabled;
-        
-        if (privateRoomsHopperEnabled)
-        {
-            StartCoroutine(PrivateRoomsHoppingCoroutine());
-        }
-    }
-    
-    IEnumerator PrivateRoomsHoppingCoroutine()
-    {
-        while (privateRoomsHopperEnabled)
-        {
-            if (!isJoiningPrivateRoom && !PhotonNetwork.InRoom && Time.time - lastPrivateJoinAttempt > PRIVATE_JOIN_COOLDOWN)
-            {
-                JoinNextPrivateRoom();
-                lastPrivateJoinAttempt = Time.time;
-            }
-            
-            yield return new WaitForSeconds(1f);
-        }
-    }
-    
-    void JoinPrivateRoom(string roomCode)
-    {
-        if (isJoiningPrivateRoom || PhotonNetwork.InRoom || string.IsNullOrEmpty(roomCode))
-        {
-            return;
-        }
-        
-        isJoiningPrivateRoom = true;
-        
-        try
-        {
-            // Use the same logic as DataCollection-Project
-            PhotonNetworkController.Instance.AttemptToJoinSpecificRoom(roomCode, JoinType.Solo);
-        }
-        catch (System.Exception e)
-        {
-            UnityEngine.Debug.LogError($"Error joining private room {roomCode}: {e.Message}");
-            isJoiningPrivateRoom = false;
-        }
-    }
-    
-    void JoinNextPrivateRoom()
-    {
-        if (privateRoomCodes.Count == 0)
-        {
-            return;
-        }
-        
-        if (currentPrivateRoomIndex >= privateRoomCodes.Count)
-        {
-            currentPrivateRoomIndex = 0;
-        }
-        
-        string roomToJoin = privateRoomCodes[currentPrivateRoomIndex];
-        JoinPrivateRoom(roomToJoin);
-        
-        // Move to next room in list
-        currentPrivateRoomIndex = (currentPrivateRoomIndex + 1) % privateRoomCodes.Count;
-    }
-    
+    // Private Room Management Methods
     void AddPrivateRoomCode(string roomCode)
     {
         if (!string.IsNullOrEmpty(roomCode) && !privateRoomCodes.Contains(roomCode))
@@ -748,12 +281,38 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
                     currentPrivateRoomIndex = config.CurrentIndex;
                 }
             }
+            else
+            {
+                // Load default room codes if no config file exists
+                LoadDefaultRoomCodes();
+                SavePrivateRoomCodes(); // Save the defaults to config file
+            }
         }
         catch (System.Exception e)
         {
             UnityEngine.Debug.LogError($"Failed to load private rooms config: {e.Message}");
-            privateRoomCodes = new List<string>();
+            LoadDefaultRoomCodes();
         }
+    }
+    
+    void LoadDefaultRoomCodes()
+    {
+        privateRoomCodes = new List<string>
+        {
+            "MBEACHY", "AA", "TWINK", "COFFEE", "DYL", "JB630", "CHAMOYVR", "XQMVR", "LT777", "XQMVVR",
+            "RAEPLAYS", "LT", "RAE", "CHAMOY", "XQMVGT", "XQMV1", "XQMV", "JB360", "LUVOGT", "360",
+            "@OLIVERSAG", "LUVO", "LEMONPP", "GAY", "67MANGO", "MANGO67", "OFFICAL67", "OFFICALVR", "OLIVERSAGE", "BANSHEE",
+            "ESPRESSO", "BANSH33", "HELP", "DOPEVR8", "HIDE", "CGT", "H3LP", "LUCIO", "DOPEVR", "404",
+            "KIRPI4", "SNAZZY", "FACELESS", "6", "MANDA67", "SREN", "RUN", "SREN18", "FAADUU", "MODS",
+            "GLITCH", "ZION", "5", "DOPEVR0", "GOOP11", "4", "@PIXEL", "MOLLYGT1", "GOOPER12", "LTMERCH",
+            "FOOJO", "TTT", "FOOJ", "TTTPIG", "NIFTY", "FELINE", "FELINE67", "ELLIOT", "LILYSINGS", "GOOP12",
+            "CHUNKY", "GTAG", "BPP", "RYAN", "K9", "FOGGY", "JMANCURLY", "RYANVR", "69", "7",
+            "ALECVR", "10", "LANAVR", "67", "ALEC", "ZBR", "MELT", "67777", "VEN1", "0",
+            "PIXEL", "MBEACHY67", "RF5", "THATCYAN", "MOD", "GULLIBLE", "JMAN", "VIKING", "WATERMAN", "REDBOY",
+            "CRYPTIK", "WAG3R", "3", "BUBBLES", "SOCKYSOCK", "8", "NORGE", "QWERTY", "9", "NACHO",
+            "MYM", "FEM", "2", "MBEACHY1", "COFFEE", "BOYS", "1", "GIRLS"
+        };
+        currentPrivateRoomIndex = 0;
     }
     
     void SavePrivateRoomCodes()
@@ -778,7 +337,6 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
     // Photon callbacks for private room joining
     public void OnJoinedRoom()
     {
-        isJoiningPrivateRoom = false;
         isSimpleJoining = false;
         
         // Start countdown when we successfully join a room
@@ -795,7 +353,6 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
     
     public void OnJoinRoomFailed(short returnCode, string message)
     {
-        isJoiningPrivateRoom = false;
         isSimpleJoining = false;
         UnityEngine.Debug.LogError($"Failed to join private room. Code: {returnCode}, Message: {message}");
         
@@ -833,77 +390,29 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
     public void OnDisconnected(DisconnectCause cause)
     {
         UnityEngine.Debug.Log($"SimplePrivateRoomHopper: Disconnected from Photon: {cause}");
-        isJoiningPrivateRoom = false;
         isSimpleJoining = false;
     }
     
-    public void OnRegionListReceived(RegionHandler regionHandler)
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnCustomAuthenticationResponse(Dictionary<string, object> data)
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnCustomAuthenticationFailed(string debugMessage)
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnConnected()
-    {
-        // Not needed for our use case
-    }
+    public void OnRegionListReceived(RegionHandler regionHandler) { }
+    public void OnCustomAuthenticationResponse(Dictionary<string, object> data) { }
+    public void OnCustomAuthenticationFailed(string debugMessage) { }
+    public void OnConnected() { }
     
     // IMatchmakingCallbacks implementation
-    public void OnFriendListUpdate(List<FriendInfo> friendList)
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnCreatedRoom()
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnCreateRoomFailed(short returnCode, string message)
-    {
-        // Not needed for our use case
-    }
-    
+    public void OnFriendListUpdate(List<FriendInfo> friendList) { }
+    public void OnCreatedRoom() { }
+    public void OnCreateRoomFailed(short returnCode, string message) { }
     public void OnJoinedLobby()
     {
         UnityEngine.Debug.Log("SimplePrivateRoomHopper: Joined Photon Lobby");
     }
+    public void OnLeftLobby() { }
+    public void OnRoomListUpdate(List<RoomInfo> roomList) { }
+    public void OnLobbyStatisticsUpdate(List<TypedLobbyInfo> lobbyStatistics) { }
+    public void OnJoinRandomFailed(short returnCode, string message) { }
+    public void OnPreLeavingRoom() { }
     
-    public void OnLeftLobby()
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnRoomListUpdate(List<RoomInfo> roomList)
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnLobbyStatisticsUpdate(List<TypedLobbyInfo> lobbyStatistics)
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnJoinRandomFailed(short returnCode, string message)
-    {
-        // Not needed for our use case
-    }
-    
-    public void OnPreLeavingRoom()
-    {
-        // Not needed for our use case
-    }
-    
-    // Simple Private Room Hopper Methods (using core logic from DataCollection-Project)
+    // Simple Private Room Hopper Methods
     void ToggleSimplePrivateRoomHopper()
     {
         simplePrivateRoomToggle = !simplePrivateRoomToggle;
