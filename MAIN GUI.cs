@@ -26,7 +26,7 @@ public class MAINGUI : BaseUnityPlugin, IConnectionCallbacks, IMatchmakingCallba
     private bool isSimpleJoining = false;
     private float lastSimpleJoinAttempt = 0f;
     private float lastSimpleLeaveTime = 0f;
-    private const float SIMPLE_JOIN_COOLDOWN = 3f; // 3 seconds in room before leaving
+    private const float SIMPLE_JOIN_COOLDOWN = 5f; // 3 seconds in room before leaving
     private const float SIMPLE_LEAVE_COOLDOWN = 5f; // 5 seconds after leaving before joining next room
     private Dictionary<string, float> failedRooms = new Dictionary<string, float>(); // Track failed rooms with timestamps
     private const float FAILED_ROOM_COOLDOWN = 30f; // 30 seconds before retrying a failed room
@@ -552,4 +552,5 @@ public class PrivateRoomsConfig
 {
     public List<string> RoomCodes { get; set; } = new List<string>();
     public int CurrentIndex { get; set; } = 0;
+
 }
